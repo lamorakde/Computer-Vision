@@ -2,6 +2,8 @@
 using namespace cv;
 using namespace std;
 
+static enum { RED, GREEN, BLUE, WHITE, BLACK } color;
+
 void czh_inverseBinary(Mat & src_bw_Image, Mat & dst_bw_Image)
 {
 	// 使用 LUT 反转图像中黑白像素
@@ -233,4 +235,63 @@ void czh_skeleton(Mat & srcImage, Mat & dstImage, int iterations = 10)
 		//如果两个遍历扫描过程已经没有可以细化的像素了，则退出迭代
 		if (!isFinished) break;
 	}
+}
+
+void czh_extractColor(Mat &srcImage, Mat & dstImage, int color = RED)
+{
+	// 输入参数：Mat & srcImage 是一个三通道 Mat对象昂
+	// 输入参数：Mat & dstImage 是一个与 srcImage 相同尺寸的单通道Mat对象，并输出至 dstImage 对象中
+	// 输入参数：int color 是想要提取的颜色，目前只支持红色（RED）
+	// 该函数输入一个三通道RGB图像，抽取该图像中的 color 颜色的像素，保存为白色像素，其他像素置为黑色，结果保存在 dstImage 对象中
+
+	if (!srcImage.data)
+	{
+		cerr << "打开图像失败." << endl;
+		return;
+	}
+	if (srcImage.type() != CV_8UC3)
+	{
+		cerr << "该函数只支持三通道图像." << endl;
+		return;
+	}
+	if (dstImage.type() != CV_8UC1)
+	{
+		cerr << "该函数输出图像对象必须为一个单通道对象." << endl;
+		return;
+	}
+
+	Mat temp; srcImage.copyTo(temp); // 把源图像复制到 temp 临时对象之中
+	Mat dst(srcImage.size(), CV_8UC1);	// 目标图像初始化为源图像尺寸，单通道
+	MatIterator_<Vec3b> itBegin, itEnd;	// 源图像遍历迭代器
+	MatIterator_<uchar> itDst;	// 目标图像遍历迭代器
+	int meanRed, meanGreen, distance, distanceThreshold;;		// 阈值算法需要的参数: 红色均值，绿色均值，像素均值之差，阈值
+	
+	switch (color)	// 根据不同颜色，选择不同的参数
+	{
+		case RED:
+			meanRed = 200;
+			meanGreen = 23;
+			distanceThreshold = 70;
+			break;
+		case BLUE:
+			break;
+		case GREEN:
+			break;
+	}
+
+	for (itBegin = temp.begin<Vec3b>(), itEnd = temp.end<Vec3b>(), itDst = dst.begin<uchar>(); itBegin != itEnd; itBegin++, itDst++)
+	{
+		// (*itBegin)[1]  Green pixels
+		// (*itBegin)[2]  Red pixels
+		distance = fabs((*itBegin)[1] - meanGreen) + fabs((*itBegin)[2] - meanRed);
+		if (distance < distanceThreshold)
+		{
+			(*itDst) = 255;
+		}
+		else
+		{
+			(*itDst) = 0;
+		}
+	}
+	dst.copyTo(dstImage);	// 将临时目标对象赋给函数目标对象
 }
