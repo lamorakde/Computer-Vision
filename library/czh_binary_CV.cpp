@@ -1,8 +1,12 @@
 #include "opencv2/opencv.hpp"
+#include <windows.h>
+
 using namespace cv;
 using namespace std;
 
 static enum { RED, GREEN, BLUE, WHITE, BLACK } color;
+#define WORD_IN_RED SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY |	FOREGROUND_RED)
+#define WORD_IN_WHITE SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE),FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
 
 void czh_inverseBinary(Mat & src_bw_Image, Mat & dst_bw_Image)
 {
@@ -296,6 +300,73 @@ void czh_extractColor(Mat &srcImage, Mat & dstImage, int color = RED)
 	dst.copyTo(dstImage);	// 将临时目标对象赋给函数目标对象
 }
 
+void czh_minFilter(Mat &srcImage, Mat & dstImage, int radius)
+{
+	// 该函数输入一个单通道图像，做最小值滤波，窗口大小 size * size
+// 	if ( (srcImage.type() != CV_32FC1) || (srcImage.type() != CV_8UC1))
+// 	{
+// 		cerr << "输入图像必须为单通道图像.\n";
+// 		return;
+// 	}
+	Mat src;
+	srcImage.copyTo(src);
+	Mat dst(srcImage.size(), srcImage.type(), Scalar::all(0));
+	switch (srcImage.type())
+	{
+	case CV_8UC1:
+	{
+		int minValue;
+		for (int i = radius; i < src.rows - radius; i++)	// 遍历每个像素
+		{
+			for (int j = radius; j < src.cols - radius; j++)
+			{
+				minValue = src.at<uchar>(i, j);
+				// 针对每个像素，在一个窗口之中遍历寻找最小值
+				for (int windows_rows_number = - radius; windows_rows_number <= radius; windows_rows_number++)
+				{
+					for (int windows_cols_number = - radius; windows_cols_number <= radius; windows_cols_number++)
+					{
+						if (src.at<uchar>(i + windows_rows_number, j + windows_cols_number) < minValue)
+						{
+							minValue = src.at<uchar>(i + windows_rows_number, j + windows_cols_number);
+						}
+					}
+				}
+				dst.at<uchar>(i, j) = minValue;
+			}
+		}
+		break;
+	}
+		
+	case CV_32FC1:
+	{
+		float minValue;
+		for (int i = radius; i < src.rows - radius; i++)	// 遍历每个像素
+		{
+			for (int j = radius; j < src.cols - radius; j++)
+			{
+				minValue = src.at<float>(i, j);
+				// 针对每个像素，在一个窗口之中遍历寻找最小值
+				for (int windows_rows_number = -radius; windows_rows_number <= radius; windows_rows_number++)
+				{
+					for (int windows_cols_number = -radius; windows_cols_number <= radius; windows_cols_number++)
+					{
+						if (src.at<float>(i + windows_rows_number, j + windows_cols_number) < minValue)
+						{
+							minValue = src.at<float>(i + windows_rows_number, j + windows_cols_number);
+						}
+					}
+				}
+				dst.at<float>(i, j) = minValue;
+			}
+		}
+		break;
+	}
+	} // switch finishes
+	
+	dstImage = dst;
+}
+
 void czh_imwrite(Mat &dstImage,const string imageName)
 {
 	// 该函数自动判断输出图像Mat对象的类型，以决定输出图像是灰度图像或者是三通道图像
@@ -311,4 +382,31 @@ void czh_imwrite(Mat &dstImage,const string imageName)
 	}
 	cout << "Output image name:\t" << dstFileName << endl;
 	imwrite(dstFileName, dstImage);
+}
+
+void czh_helpInformation(string const &functionInfo)
+{
+	// 程序信息：程序功能
+	WORD_IN_WHITE;
+	cout << "************************************************************************************************************************\n";
+	cout << "\t\t\t\t\tProgram information:\n";
+	cout << "\t\t\t\t" << functionInfo << "\n\n";
+	cout << "************************************************************************************************************************\n\n";
+}
+
+void czh_imageOpenDetect(Mat & srcImage, string & fileName, string & fileType)
+{	// 检测图像对象是否已经成功打开，如果没有正确打开
+	string srcFileName = fileName + fileType;
+	if (srcImage.data == nullptr)
+	{
+		WORD_IN_RED;
+		cerr << "警告: 试图打开文件: " << srcFileName << " 失败，请确认文件名和文件类型正确.\n\n";
+		WORD_IN_WHITE;
+		cout << "Enter the input image name without ." << fileType << ": ";
+		getline(cin, fileName);				// 获得输入文件名
+		srcFileName = fileName + ".ppm";	// 确定输入图片文件类型
+		srcImage = imread(srcFileName);	// 读取源图像
+		czh_imageOpenDetect(srcImage, fileName, srcFileName);
+	}
+	return;
 }

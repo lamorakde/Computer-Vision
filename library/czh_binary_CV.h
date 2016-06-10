@@ -12,6 +12,9 @@ void czh_endPoint(Mat & src_skeleton_Image, Mat & dst_endPoint_Image);	// 程序将
 void czh_writeWhitePixel(Mat & srcImage, vector<Point2f> & dstWhitePoints);// 找出该图像中的白色像素并将像素坐标存于输入参数矢量
 void czh_skeleton(Mat & srcImage, Mat & dstImage, int iterations = 10);	// 该函数输入一个二值图像或者灰度图像，输出该图像的骨骼
 void czh_extractColor(Mat &srcImage, Mat & dstImage, int color = RED);	// 该函数输入一个三通道RGB图像，抽取该图像中的 color 颜色的像素，保存为白色像素
+void czh_minFilter(Mat &srcImage, Mat & dstImage, int size);	// 该函数输入一个单通道图像，做最小值滤波，窗口大小 size * size
 
+void czh_helpInformation(string const &functionInfo);	// 程序信息：程序功能
+void czh_imageOpenDetect(Mat & srcImage, string & fileName, string & fileType);
 void czh_imwrite(Mat &dstImage, const string imageName);// 该函数自动判断输出图像Mat对象的类型，以决定输出图像是灰度图像(pgm)或者是三通道图像(ppm)
 #endif
