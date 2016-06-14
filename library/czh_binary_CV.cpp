@@ -24,7 +24,7 @@ void czh_inverseBinary(Mat & src_bw_Image, Mat & dst_bw_Image)
 	{
 		p[i] = inverseBinaryTable[i];
 	}
-	LUT(tmpImage, lookUpTable, dst_bw_Image);
+	cv::LUT(tmpImage, lookUpTable, dst_bw_Image);
 }
 
 void czh_endPoint(Mat & src_skeleton_Image, Mat & dst_endPoint_Image)
@@ -111,7 +111,7 @@ void czh_writeWhitePixel(Mat & srcImage, vector<Point2f> & dstWhitePoints)
 	}
 }
 
-void czh_skeleton(Mat & srcImage, Mat & dstImage, int iterations = 10)
+void czh_thin_parallel(Mat & srcImage, Mat & dstImage, int iterations)
 {
 	// 该函数输入一个二值图像或者灰度图像，输出该图像的骨骼
 	if (srcImage.type() != CV_8UC1)
@@ -238,6 +238,285 @@ void czh_skeleton(Mat & srcImage, Mat & dstImage, int iterations = 10)
 
 		//如果两个遍历扫描过程已经没有可以细化的像素了，则退出迭代
 		if (!isFinished) break;
+	}
+}
+
+void czh_thin_LUT(Mat & srcImage, Mat & dstImage, int iterations)
+{
+	// 该函数输入一个二值图像或者灰度图像，输出该图像的骨骼
+	if (srcImage.type() != CV_8UC1)
+	{
+		cerr << "只能处理二值或灰度图像.\n";
+		cerr << "读取图像函数: imread() 加上参数 \"0\" 或许可以修复该问题.\n";
+		return;
+	}
+
+	// 用于查表法的表
+	int array[256] = {	0,0,1,1,0,0,1,1,1,1,0,1,1,1,0,1,
+						1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,1,
+						0,0,1,1,0,0,1,1,1,1,0,1,1,1,0,1,
+						1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,1,
+						1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,
+						0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+						1,1,0,0,1,1,0,0,1,1,0,1,1,1,0,1,
+						0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+						0,0,1,1,0,0,1,1,1,1,0,1,1,1,0,1,
+						1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,1,
+						0,0,1,1,0,0,1,1,1,1,0,1,1,1,0,1,
+						1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,0,
+						1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,
+						1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,0,
+						1,1,0,0,1,1,0,0,1,1,0,1,1,1,0,0,
+						1,1,0,0,1,1,1,0,1,1,0,0,1,0,0,0 };
+
+	// 准备临时 Mat 对象
+	Mat tempImage;
+	srcImage.copyTo(dstImage);
+	srcImage.copyTo(tempImage);
+
+	// 为了保证效果，先做膨胀操作，使断点连接起来
+	dilate(srcImage, dstImage, getStructuringElement(MORPH_RECT, Size(3, 3), Point(-1, -1)), Point(-1, -1), 3);
+	
+	// 该算法是用于黑色像素，所以先翻转图像进行抽取骨架操作，最后再转换回去
+	MatIterator_<uchar> itBegin, itEnd;
+	for (itBegin = dstImage.begin<uchar>(), itEnd = dstImage.end<uchar>(); itBegin != itEnd; itBegin++)
+	{
+		(*itBegin) = abs((*itBegin) - 255);
+	}
+
+	// 开始迭代
+	int pointValue;
+
+	uchar * ptrTop, *ptrCur, *ptrBot; // 8邻域中上一行，当前行和下一行的行指针
+	uchar * dstPtr;	// 目标图像当前行指针
+
+	// 因为是 8 邻域操作，所以宽和高各减1，防止指针溢出
+	const int height = srcImage.rows - 1;
+	const int width = srcImage.cols - 1;
+
+	for (int loop = 0; loop < iterations; loop++)
+	{
+		bool changed = false;	// 判断该次迭代是否修改了像素颜色
+
+		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		//																														   //
+		//													遍历扫描过程一:开始                                                    //
+		//																														   //
+		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+		bool next = true;			// 重置跳跃监视符
+		dstImage.copyTo(tempImage);	// 每次迭代，都将修改过后的目标图像复制给临时图像进行检查处理
+
+		for (int i = 1; i < height; i++)
+		{
+			// 给3*3邻域中每一行行指针赋值
+			ptrTop = tempImage.ptr<uchar>(i - 1);
+			ptrCur = tempImage.ptr<uchar>(i);
+			ptrBot = tempImage.ptr<uchar>(i + 1);
+			dstPtr = dstImage.ptr<uchar>(i);
+
+			for (int j = 1; j < width; j++)
+			{
+				if (((int)ptrCur[j - 1] + (int)ptrCur[j] + (int)ptrCur[j + 1]) == 0)	// 如果该点左右邻居都是黑色，则跳过该点不做处理
+				{
+					dstPtr[j] = ptrCur[j];
+					continue;
+				};
+
+				if (next == false)	// 如果修改完某个点( next 会被置为 false)，则跳过下一个点不做处理
+				{
+					next = true;
+					dstPtr[j] = ptrCur[j];
+					continue;
+				};
+
+				if ((int)ptrCur[j] == 0)	// 如果某个点为黑色，进行判断
+				{
+					pointValue = 0;
+
+					// 第一行
+					if ((int)(ptrTop[j - 1]) == 255)
+					{
+						pointValue += 1;
+					}
+					if ((int)(ptrTop[j]) == 255)
+					{
+						pointValue += 2;
+					}
+					if ((int)(ptrTop[j + 1]) == 255)
+					{
+						pointValue += 4;
+					}
+
+					// 第二行
+					if ((int)(ptrCur[j - 1]) == 255)
+					{
+						pointValue += 8;
+					}
+					if ((int)(ptrCur[j]) == 255)
+					{
+						pointValue += 0;
+					}
+					if ((int)(ptrCur[j + 1]) == 255)
+					{
+						pointValue += 16;
+					}
+
+					// 第三行
+					if ((int)(ptrBot[j - 1]) == 255)
+					{
+						pointValue += 32;
+					}
+					if ((int)(ptrBot[j]) == 255)
+					{
+						pointValue += 64;
+					}
+					if ((int)(ptrBot[j + 1]) == 255)
+					{
+						pointValue += 128;
+					}
+
+					dstPtr[j] = 255 * array[pointValue];
+
+					if (dstPtr[j] == 255)	
+					{
+						next = false;	// 如果修改了当前像素（从黑变为白），则跳过下一个点
+						changed = true;	// 并且把 changed 设置为true
+					}
+					else dstPtr[j] = ptrCur[j];
+				}
+			}
+		}
+
+		// 将最上下两行，左右两列变为白色
+		ptrTop = dstImage.ptr<uchar>(0);
+		ptrBot = dstImage.ptr<uchar>(dstImage.rows - 1);
+
+		for (int i = 0; i < dstImage.cols; i++)
+		{
+			ptrTop[i] = 255;
+			ptrBot[i] = 255;
+		}
+		for (int i = 0; i < dstImage.rows; i++)
+		{
+			dstImage.at<uchar>(i, 0) = 255;
+			dstImage.at<uchar>(i, dstImage.cols - 1) = 255;
+		}
+
+		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		//																														   //
+		//													遍历扫描过程二:开始                                                    //
+		//																														   //
+		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+		next = true;			// 重置跳跃监视符
+		dstImage.copyTo(tempImage);	// 每次迭代，都将修改过后的目标图像复制给临时图像进行检查处理
+
+		for (int j = 1; j < width; j++)
+		{
+			for (int i = 1; i < height; i++)
+			{
+				// 给3*3邻域中每一行行指针赋值
+				ptrTop = tempImage.ptr<uchar>(i - 1);
+				ptrCur = tempImage.ptr<uchar>(i);
+				ptrBot = tempImage.ptr<uchar>(i + 1);
+				dstPtr = dstImage.ptr<uchar>(i);
+
+				if (((int)ptrTop[j] + (int)ptrCur[j] + (int)ptrBot[j]) == 0)	// 如果该点上下邻居都是黑色，则跳过该点不做处理
+				{
+					dstPtr[j] = ptrCur[j];
+					continue;
+				};
+
+				if (next == false)	// 如果修改完某个点( next 会被置为 false)，则跳过下一个点不做处理
+				{
+					next = true;
+					dstPtr[j] = ptrCur[j];
+					continue;
+				};
+
+				if ((int)ptrCur[j] == 0)	// 如果某个点为黑色，进行判断
+				{
+					pointValue = 0;
+
+					// 第一行
+					if ((int)(ptrTop[j - 1]) == 255)
+					{
+						pointValue += 1;
+					}
+					if ((int)(ptrTop[j]) == 255)
+					{
+						pointValue += 2;
+					}
+					if ((int)(ptrTop[j + 1]) == 255)
+					{
+						pointValue += 4;
+					}
+
+					// 第二行
+					if ((int)(ptrCur[j - 1]) == 255)
+					{
+						pointValue += 8;
+					}
+					if ((int)(ptrCur[j]) == 255)
+					{
+						pointValue += 0;
+					}
+					if ((int)(ptrCur[j + 1]) == 255)
+					{
+						pointValue += 16;
+					}
+
+					// 第三行
+					if ((int)(ptrBot[j - 1]) == 255)
+					{
+						pointValue += 32;
+					}
+					if ((int)(ptrBot[j]) == 255)
+					{
+						pointValue += 64;
+					}
+					if ((int)(ptrBot[j + 1]) == 255)
+					{
+						pointValue += 128;
+					}
+
+					dstPtr[j] = 255 * array[pointValue];
+
+					if (dstPtr[j] == 255)	// 如果修改了当前像素（从黑变为白），则跳过下一个点
+					{
+						next = false;	// 如果修改了当前像素（从黑变为白），则跳过下一个点
+						changed = true;	// 并且把 changed 设置为true
+					}
+					else dstPtr[j] = ptrCur[j];
+				}
+			}
+		}
+
+		// 将最上下两行，左右两列变为白色
+		ptrTop = dstImage.ptr<uchar>(0);
+		ptrBot = dstImage.ptr<uchar>(dstImage.rows - 1);
+		for (int i = 0; i < dstImage.cols; i++)
+		{
+			ptrTop[i] = 255;
+			ptrBot[i] = 255;
+		}
+		for (int i = 0; i < dstImage.rows; i++)
+		{
+			dstImage.at<uchar>(i, 0) = 255;
+			dstImage.at<uchar>(i, dstImage.cols - 1) = 255;
+		}
+
+		if (changed == false)
+		{
+			break;	// 如果一次迭代没有删除任何像素，则认为已经结束细化，则直接退出
+		}
+	}
+
+	// 最后再反转黑白
+	for (itBegin = dstImage.begin<uchar>(), itEnd = dstImage.end<uchar>(); itBegin != itEnd; itBegin++)
+	{
+		(*itBegin) = abs((*itBegin) - 255);
 	}
 }
 
@@ -395,18 +674,131 @@ void czh_helpInformation(string const &functionInfo)
 }
 
 void czh_imageOpenDetect(Mat & srcImage, string & fileName, string & fileType)
-{	// 检测图像对象是否已经成功打开，如果没有正确打开
+{	// 检测图像对象是否已经成功打开
 	string srcFileName = fileName + fileType;
 	if (srcImage.data == nullptr)
 	{
 		WORD_IN_RED;
 		cerr << "警告: 试图打开文件: " << srcFileName << " 失败，请确认文件名和文件类型正确.\n\n";
 		WORD_IN_WHITE;
-		cout << "Enter the input image name without ." << fileType << ": ";
+		cout << "Enter the input image name without " << fileType << ": ";
+		fileName.clear(); srcFileName.clear();
 		getline(cin, fileName);				// 获得输入文件名
-		srcFileName = fileName + ".ppm";	// 确定输入图片文件类型
+		srcFileName = fileName + fileType;	// 确定输入图片文件类型
 		srcImage = imread(srcFileName);	// 读取源图像
 		czh_imageOpenDetect(srcImage, fileName, srcFileName);
 	}
 	return;
 }
+
+void czh_middlePointCircle(int x0, int y0, int radius, vector<Point> &pointsOfCircle)
+{
+	// 该函数计算以点 (x0, y0) 为圆心， radius为半径的圆
+	// 并将圆上的点的坐标导入 vector<Point>矢量 pointsOfCircle 之中
+	// 中点画圆法的另外一种优化方法
+	int x = radius;
+	int y = 0;
+	int error = 0;
+
+	vector<Point>().swap(pointsOfCircle);	// 清空目标矢量
+	vector<vector<Point>> pointsDirection(8);	// 临时储存矢量
+
+	while (x >= y)
+	{
+		pointsDirection[0].push_back(Point(x0 + x, y0 + y));
+		pointsDirection[1].push_back(Point(x0 + y, y0 + x));
+		pointsDirection[6].push_back(Point(x0 - y, y0 + x));
+		pointsDirection[7].push_back(Point(x0 - x, y0 + y));
+		pointsDirection[4].push_back(Point(x0 - x, y0 - y));
+		pointsDirection[5].push_back(Point(x0 - y, y0 - x));
+		pointsDirection[2].push_back(Point(x0 + y, y0 - x));
+		pointsDirection[3].push_back(Point(x0 + x, y0 - y));
+		
+		error += 1 + 2 * y;
+		y += 1;
+		if (2 * (error - x) + 1 > 0)
+		{
+			error += 1 - 2 * x;
+			x -= 1;
+		}
+	}
+
+	// 因为对称性，有4个组的点旋转顺序并不正确，需要调整顺序
+	for (int i = 0; i < pointsDirection[1].size() / 2; i++)
+	{
+		swap(pointsDirection[1][i], pointsDirection[1][pointsDirection[1].size() - 1 - i]);
+		swap(pointsDirection[3][i], pointsDirection[3][pointsDirection[3].size() - 1 - i]);
+		swap(pointsDirection[5][i], pointsDirection[5][pointsDirection[5].size() - 1 - i]);
+		swap(pointsDirection[7][i], pointsDirection[7][pointsDirection[7].size() - 1 - i]);
+	}
+
+	for (int i = 0; i < 8; i++)
+	{
+		for (int j = 0; j < pointsDirection[0].size(); j++)
+		{
+			pointsOfCircle.push_back(pointsDirection[i][j]);
+		}
+	}
+}
+
+void czh_BresenhamCircle(int x0, int y0, int radius, vector<Point> &pointsOfCircle)
+{
+	// 该函数计算以点 (x0, y0) 为圆心， radius为半径的圆
+	// 并将圆上的点的坐标以12点钟方向开始顺时针方向依次导入 vector<Point>矢量 pointsOfCircle 之中
+	// ref : algorithm of Bresenham
+	vector<Point>().swap(pointsOfCircle);	// 清空目标矢量
+	vector<vector<Point>> pointsDirection(8);	// 临时储存矢量
+	int x, y, distance;
+	x = 0;
+	y = radius;
+	distance = 3 - 2 * radius;
+
+	pointsDirection[0].push_back(Point(x0 + x, y0 + y));
+	pointsDirection[1].push_back(Point(x0 + y, y0 + x));
+	pointsDirection[6].push_back(Point(x0 - y, y0 + x));
+	pointsDirection[7].push_back(Point(x0 - x, y0 + y));
+	pointsDirection[4].push_back(Point(x0 - x, y0 - y));
+	pointsDirection[5].push_back(Point(x0 - y, y0 - x));
+	pointsDirection[2].push_back(Point(x0 + y, y0 - x));
+	pointsDirection[3].push_back(Point(x0 + x, y0 - y));
+	
+	while (x < y)
+	{
+		if (distance < 0)
+		{
+			distance += 4 * x + 6;
+		}
+		else
+		{
+			distance += 4 * (x - y) + 10;
+			y--;
+		}
+		x++;
+		pointsDirection[0].push_back(Point(x0 + x, y0 + y));	
+		pointsDirection[1].push_back(Point(x0 + y, y0 + x));// 顺序不正确
+		pointsDirection[6].push_back(Point(x0 - y, y0 + x));	
+		pointsDirection[7].push_back(Point(x0 - x, y0 + y));// 顺序不正确
+		pointsDirection[4].push_back(Point(x0 - x, y0 - y));	
+		pointsDirection[5].push_back(Point(x0 - y, y0 - x));// 顺序不正确
+		pointsDirection[2].push_back(Point(x0 + y, y0 - x));	
+		pointsDirection[3].push_back(Point(x0 + x, y0 - y));// 顺序不正确
+	}
+
+	// 因为对称性，有4个组的点旋转顺序并不正确，需要调整顺序
+	for (int i = 0; i < pointsDirection[1].size() / 2; i++)
+	{
+		swap(pointsDirection[1][i], pointsDirection[1][pointsDirection[1].size() - 1 - i]);
+		swap(pointsDirection[3][i], pointsDirection[3][pointsDirection[3].size() - 1 - i]);
+		swap(pointsDirection[5][i], pointsDirection[5][pointsDirection[5].size() - 1 - i]);
+		swap(pointsDirection[7][i], pointsDirection[7][pointsDirection[7].size() - 1 - i]);
+	}
+
+	for (int i = 0; i < 8; i++)
+	{
+		for (int j = 0; j < pointsDirection[i].size(); j++)
+		{
+			pointsOfCircle.push_back(pointsDirection[i][j]);
+		}
+	}
+}
+
