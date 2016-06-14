@@ -802,3 +802,37 @@ void czh_BresenhamCircle(int x0, int y0, int radius, vector<Point> &pointsOfCirc
 	}
 }
 
+void czh_Circle_Profile(const Mat & srcImage, const int x0, const int y0, const int radius)
+{
+	// 展示以选定点为圆心，radius为半径的圆的灰度变化
+
+	// 对以被选择的点为圆心，radius为半径画一个圆，圆上的点坐标被存在 pointsOfCircle 矢量之中
+	vector<Point> pointsOfCircle;
+	czh_BresenhamCircle(x0, y0, radius, pointsOfCircle);
+
+	// 将圆上的点的灰度值存在 valuesOfPoints 矢量之中
+	vector<int> valuesOfPoints;	// 清空目标矢量
+	for (int i = 0; i < pointsOfCircle.size(); i++)
+	{
+		valuesOfPoints.push_back((int)srcImage.at<uchar>(pointsOfCircle[i]));
+	}
+	valuesOfPoints.push_back((int)srcImage.at<uchar>(pointsOfCircle[0]));	// 额外添加一个元素，它与第一个像素的灰度相同
+
+	int profileHeight = 255;	// profile图像高度
+	int profileWidth = pointsOfCircle.size() * 6;	// profile 图像宽度
+	Mat profileImage(profileHeight, profileWidth, CV_8UC1, Scalar::all(0));
+
+	for (int x = 0; x < pointsOfCircle.size(); x++)
+	{
+		int y = profileHeight - valuesOfPoints[x] / 2;
+		for (; y < profileHeight; y++)
+		{
+			profileImage.at<uchar>(y, 4 * x) = 255;
+			profileImage.at<uchar>(y, 4 * x + 1) = 255;
+			profileImage.at<uchar>(y, 4 * x + 2) = 255;
+			profileImage.at<uchar>(y, 4 * x + 3) = 255;
+		}
+	}
+	imshow("Profile", profileImage);
+
+}

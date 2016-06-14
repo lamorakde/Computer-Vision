@@ -20,6 +20,6 @@ void czh_imageOpenDetect(Mat & srcImage, string & fileName, string & fileType);/
 
 void czh_middlePointCircle(int x0, int y0, int radius, vector<Point> &pointsOfCircle); // 该函数计算以点 (x0, y0) 为圆心， radius为半径的圆并将圆上的点的坐标导入 vector<Point>矢量 pointsOfCircle 之中
 void czh_BresenhamCircle(int x0, int y0, int radius, vector<Point> &pointsOfCircle);	// Bresenham 优化画圆算法
-
+void czh_Circle_Profile(const Mat & srcImage, const int x0, const int y0, const int radius); // 展示以选定点为圆心，radius为半径的圆的灰度变化
 void czh_imwrite(Mat &dstImage, const string imageName);// 该函数自动判断输出图像Mat对象的类型，以决定输出图像是灰度图像(pgm)或者是三通道图像(ppm)
 #endif
