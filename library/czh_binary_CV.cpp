@@ -753,6 +753,31 @@ void czh_BresenhamCircle(int x0, int y0, int radius, vector<Point> &pointsOfCirc
 	y = radius;
 	distance = 3 - 2 * radius;
 
+// 	while (x < y)
+// 	{
+// 		pointsDirection[0].push_back(Point(x0 + x, y0 + y));
+// 		pointsDirection[1].push_back(Point(x0 + y, y0 + x));// 顺序不正确
+// 		pointsDirection[6].push_back(Point(x0 - y, y0 + x));
+// 		pointsDirection[7].push_back(Point(x0 - x, y0 + y));// 顺序不正确
+// 		pointsDirection[4].push_back(Point(x0 - x, y0 - y));
+// 		pointsDirection[5].push_back(Point(x0 - y, y0 - x));// 顺序不正确
+// 		pointsDirection[2].push_back(Point(x0 + y, y0 - x));
+// 		pointsDirection[3].push_back(Point(x0 + x, y0 - y));// 顺序不正确
+// 
+// 		// 判断下一次的点坐标
+// 		if (distance < 0)
+// 		{
+// 			distance += 4 * x + 6;
+// 		}
+// 		else
+// 		{
+// 			distance += 4 * (x - y) + 10;
+// 			y--;
+// 		}
+// 		x++;
+// 	}
+
+
 	pointsDirection[0].push_back(Point(x0 + x, y0 + y));
 	pointsDirection[1].push_back(Point(x0 + y, y0 + x));
 	pointsDirection[6].push_back(Point(x0 - y, y0 + x));
@@ -761,7 +786,9 @@ void czh_BresenhamCircle(int x0, int y0, int radius, vector<Point> &pointsOfCirc
 	pointsDirection[5].push_back(Point(x0 - y, y0 - x));
 	pointsDirection[2].push_back(Point(x0 + y, y0 - x));
 	pointsDirection[3].push_back(Point(x0 + x, y0 - y));
-	
+
+	x++;
+
 	while (x < y)
 	{
 		if (distance < 0)
@@ -773,7 +800,6 @@ void czh_BresenhamCircle(int x0, int y0, int radius, vector<Point> &pointsOfCirc
 			distance += 4 * (x - y) + 10;
 			y--;
 		}
-		x++;
 		pointsDirection[0].push_back(Point(x0 + x, y0 + y));	
 		pointsDirection[1].push_back(Point(x0 + y, y0 + x));// 顺序不正确
 		pointsDirection[6].push_back(Point(x0 - y, y0 + x));	
@@ -782,6 +808,8 @@ void czh_BresenhamCircle(int x0, int y0, int radius, vector<Point> &pointsOfCirc
 		pointsDirection[5].push_back(Point(x0 - y, y0 - x));// 顺序不正确
 		pointsDirection[2].push_back(Point(x0 + y, y0 - x));	
 		pointsDirection[3].push_back(Point(x0 + x, y0 - y));// 顺序不正确
+
+		x++;
 	}
 
 	// 因为对称性，有4个组的点旋转顺序并不正确，需要调整顺序
@@ -836,3 +864,227 @@ void czh_Circle_Profile(const Mat & srcImage, const int x0, const int y0, const 
 	imshow("Profile", profileImage);
 
 }
+
+void czh_labeling(Mat & src, Mat & dst)
+{
+	// 该函数会使用 two - pass 算法针对二值图像做连通域标记
+
+	// 准备函数临时对象
+	Mat srcImage;
+	src.copyTo(srcImage);
+
+	///////////////////////////////////////////////////////////
+	//				      first pass                         //
+	///////////////////////////////////////////////////////////
+
+	// 因为是 8 邻域操作，所以宽和高各减1，防止指针溢出
+	const int height = srcImage.rows - 1;
+	const int width = srcImage.cols - 1;
+
+	uchar *data_cur, *data_prev;	// 当前行和上一行行指针
+	int label = 1;
+	vector<int> labelSet;
+	labelSet.push_back(0);
+	labelSet.push_back(1);
+	for (int i = 1; i < height; i++)
+	{
+		data_cur = srcImage.ptr<uchar>(i);		// 当前行行指针
+		data_prev = srcImage.ptr<uchar>(i - 1);	// 上一行行指针
+
+		for (int j = 1; j < width; j++)
+		{	// 遍历图中每一个像素
+			if (data_cur[j] == 0)
+			{	// 如果当前像素不是目标像素，则跳过该像素
+				continue;
+			}
+			int left = data_cur[j - 1];	// 左点灰度值
+			int up = data_prev[j];		// 上点灰度值
+			int neighborLabels[2];		// 用于存储左点和上点的灰度值
+			int cnt = 0;		// 用于计算左点和上点一个有多少个有效值
+			if (left != 0)		// 如果左点是有效值
+			{
+				neighborLabels[cnt++] = left;	// 把左点灰度值赋给 neighborLabels 中一个元素
+			}
+			if (up != 0)		// 如果上点是有效值
+			{
+				neighborLabels[cnt++] = up;		// 把上点灰度值赋给 neighborLabels 中另一个元素
+			}
+			if (cnt == 0)	// 如果左点和上点都为0
+			{
+				labelSet.push_back(++label);	// 则在 labelSet 中新添加一个 label
+				labelSet[label] = label;		// 给这个位置的 label 赋值
+				data_cur[j] = label;			// 修改源图像素灰度值为 label
+				continue;						// 继续下一次循环
+			}
+			int smallestLabel = neighborLabels[0];				// 如果左点和上点只有一个有效值，那么就选择该有效值的 label 作为小的label
+			if (cnt == 2 && neighborLabels[1] < smallestLabel)	// 如果左点和上点都有有效值，选择小的一个 label
+			{
+				smallestLabel = neighborLabels[1];
+			}
+			data_cur[j] = smallestLabel;	// 将源图像该点灰度值赋值为小的 label
+
+											// 保存最小等价表  
+			for (int k = 0; k < cnt; k++)
+			{
+				int tempLabel = neighborLabels[k];
+				int & oldSmallestLabel = labelSet[tempLabel];
+				if (oldSmallestLabel > smallestLabel)
+				{
+					// 当原连通域最小 label 比当前最小 label 大时，赋给当前点最小 label 并更新连通域最小 label
+					labelSet[oldSmallestLabel] = smallestLabel;
+				}
+				else if (oldSmallestLabel < smallestLabel)
+				{
+					labelSet[smallestLabel] = oldSmallestLabel;
+				}
+			}
+			// 每经过一个目标点，且它左点或上点有标记的话，就更新连通域等效最小 label 
+			// 将等效连通域中的 label 替换为连通域中最小 label 
+			// 所以每次遍历一个新点，连通域中的各个 label 总是该连通域中最小的 label
+			for (size_t i = 2; i < labelSet.size(); i++)
+			{
+				int curLabel = labelSet[i];
+				int preLabel = labelSet[curLabel];
+				while (preLabel != curLabel) {
+					curLabel = preLabel;
+					preLabel = labelSet[preLabel];
+				}
+				labelSet[i] = curLabel;
+			}
+		}
+	}
+
+	// 更新等价对列表,将最小标号给重复区域  
+	for (size_t i = 2; i < labelSet.size(); i++)
+	{
+		int curLabel = labelSet[i];
+		int preLabel = labelSet[curLabel];
+		while (preLabel != curLabel) {
+			curLabel = preLabel;
+			preLabel = labelSet[preLabel];
+		}
+		labelSet[i] = curLabel;
+	}
+
+	///////////////////////////////////////////////////////////
+	//				     second pass                         //
+	///////////////////////////////////////////////////////////
+
+	// 将图中各个像素点 label 换成同连通域最小 label
+	for (int i = 0; i < height; i++)
+	{
+		data_cur = srcImage.ptr<uchar>(i);		// 当前行行指针
+		for (int j = 0; j < width; j++)
+		{
+			data_cur[j] = labelSet[data_cur[j]];
+		}
+	}
+	
+	srcImage.copyTo(dst);
+}
+
+void czh_labeling_backup(Mat & src, Mat & dst)
+{
+	// 该函数会使用 two - pass 算法针对二值图像做连通域标记
+
+	// 准备函数临时对象
+	Mat srcImage; 
+	src.copyTo(srcImage);
+
+	///////////////////////////////////////////////////////////
+	//				      first pass                         //
+	///////////////////////////////////////////////////////////
+
+	// 因为是 8 邻域操作，所以宽和高各减1，防止指针溢出
+	const int height = srcImage.rows - 1;
+	const int width = srcImage.cols - 1;
+
+	uchar *data_cur, *data_prev;	// 当前行和上一行行指针
+	int label = 1;
+	vector<int> labelSet;
+	labelSet.push_back(0);
+	labelSet.push_back(1);
+	for (int i = 1; i < height; i++)
+	{
+		data_cur = srcImage.ptr<uchar>(i);		// 当前行行指针
+		data_prev = srcImage.ptr<uchar>(i - 1);	// 上一行行指针
+
+		for (int j = 1; j < width; j++)
+		{	// 遍历图中每一个像素
+			if (data_cur[j] == 0)
+			{	// 如果当前像素不是目标像素，则跳过该像素
+				continue;
+			}
+			int left = data_cur[j - 1];	// 左点灰度值
+			int up = data_prev[j];		// 上点灰度值
+			int neighborLabels[2];		// 用于存储左点和上点的灰度值
+			int cnt = 0;		// 用于计算左点和上点一个有多少个有效值
+			if (left != 0)		// 如果左点是有效值
+			{
+				neighborLabels[cnt++] = left;	// 把左点灰度值赋给 neighborLabels 中一个元素
+			}
+			if (up != 0)		// 如果上点是有效值
+			{
+				neighborLabels[cnt++] = up;		// 把上点灰度值赋给 neighborLabels 中另一个元素
+			}
+			if (cnt == 0)	// 如果左点和上点都为0
+			{
+				labelSet.push_back(++label);	// 则在 labelSet 中新添加一个 label
+				labelSet[label] = label;		// 给这个位置的 label 赋值
+				data_cur[j] = label;			// 修改源图像素灰度值为 label
+				continue;						// 继续下一次循环
+			}
+			int smallestLabel = neighborLabels[0];				// 如果左点和上点只有一个有效值，那么就选择该有效值的 label 作为小的label
+			if (cnt == 2 && neighborLabels[1] < smallestLabel)	// 如果左点和上点都有有效值，选择小的一个 label
+			{
+				smallestLabel = neighborLabels[1];
+			}
+			data_cur[j] = smallestLabel;	// 将源图像该点灰度值赋值为小的 label
+
+			// 保存最小等价表  
+			for (int k = 0; k < cnt; k++)
+			{
+				int tempLabel = neighborLabels[k];
+				int & oldSmallestLabel = labelSet[tempLabel];
+				if (oldSmallestLabel > smallestLabel)
+				{
+					labelSet[oldSmallestLabel] = smallestLabel;
+				}
+				else if (oldSmallestLabel < smallestLabel)
+				{
+					labelSet[smallestLabel] = oldSmallestLabel;
+				}
+			}
+
+		}
+	}
+
+	// 更新等价对列表,将最小标号给重复区域  
+	for (size_t i = 2; i < labelSet.size(); i++)
+	{
+		int curLabel = labelSet[i];
+		int preLabel = labelSet[curLabel];
+		while (preLabel != curLabel) {
+			curLabel = preLabel;
+			preLabel = labelSet[preLabel];
+		}
+		labelSet[i] = curLabel;
+	}
+
+	///////////////////////////////////////////////////////////
+	//				     second pass                         //
+	///////////////////////////////////////////////////////////
+
+	// 将图中各个像素点 label 换成同连通域最小 label
+	for (int i = 0; i < height; i++)
+	{
+		data_cur = srcImage.ptr<uchar>(i);		// 当前行行指针
+		for (int j = 0; j < width; j++)
+		{
+			data_cur[j] = labelSet[data_cur[j]];
+		}
+	}
+
+	srcImage.copyTo(dst);
+}
+
