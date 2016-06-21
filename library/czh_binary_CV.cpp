@@ -1,5 +1,6 @@
 #include "opencv2/opencv.hpp"
 #include <windows.h>
+#include "czh_binary_CV.h"
 
 using namespace cv;
 using namespace std;
@@ -753,44 +754,18 @@ void czh_BresenhamCircle(int x0, int y0, int radius, vector<Point> &pointsOfCirc
 	y = radius;
 	distance = 3 - 2 * radius;
 
-// 	while (x < y)
-// 	{
-// 		pointsDirection[0].push_back(Point(x0 + x, y0 + y));
-// 		pointsDirection[1].push_back(Point(x0 + y, y0 + x));// 顺序不正确
-// 		pointsDirection[6].push_back(Point(x0 - y, y0 + x));
-// 		pointsDirection[7].push_back(Point(x0 - x, y0 + y));// 顺序不正确
-// 		pointsDirection[4].push_back(Point(x0 - x, y0 - y));
-// 		pointsDirection[5].push_back(Point(x0 - y, y0 - x));// 顺序不正确
-// 		pointsDirection[2].push_back(Point(x0 + y, y0 - x));
-// 		pointsDirection[3].push_back(Point(x0 + x, y0 - y));// 顺序不正确
-// 
-// 		// 判断下一次的点坐标
-// 		if (distance < 0)
-// 		{
-// 			distance += 4 * x + 6;
-// 		}
-// 		else
-// 		{
-// 			distance += 4 * (x - y) + 10;
-// 			y--;
-// 		}
-// 		x++;
-// 	}
-
-
-	pointsDirection[0].push_back(Point(x0 + x, y0 + y));
-	pointsDirection[1].push_back(Point(x0 + y, y0 + x));
-	pointsDirection[6].push_back(Point(x0 - y, y0 + x));
-	pointsDirection[7].push_back(Point(x0 - x, y0 + y));
-	pointsDirection[4].push_back(Point(x0 - x, y0 - y));
-	pointsDirection[5].push_back(Point(x0 - y, y0 - x));
-	pointsDirection[2].push_back(Point(x0 + y, y0 - x));
-	pointsDirection[3].push_back(Point(x0 + x, y0 - y));
-
-	x++;
-
 	while (x < y)
 	{
+		pointsDirection[0].push_back(Point(x0 + x, y0 + y));
+		pointsDirection[1].push_back(Point(x0 + y, y0 + x));// 顺序不正确
+		pointsDirection[6].push_back(Point(x0 - y, y0 + x));
+		pointsDirection[7].push_back(Point(x0 - x, y0 + y));// 顺序不正确
+		pointsDirection[4].push_back(Point(x0 - x, y0 - y));
+		pointsDirection[5].push_back(Point(x0 - y, y0 - x));// 顺序不正确
+		pointsDirection[2].push_back(Point(x0 + y, y0 - x));
+		pointsDirection[3].push_back(Point(x0 + x, y0 - y));// 顺序不正确
+
+		// 判断下一次的点坐标
 		if (distance < 0)
 		{
 			distance += 4 * x + 6;
@@ -800,17 +775,43 @@ void czh_BresenhamCircle(int x0, int y0, int radius, vector<Point> &pointsOfCirc
 			distance += 4 * (x - y) + 10;
 			y--;
 		}
-		pointsDirection[0].push_back(Point(x0 + x, y0 + y));	
-		pointsDirection[1].push_back(Point(x0 + y, y0 + x));// 顺序不正确
-		pointsDirection[6].push_back(Point(x0 - y, y0 + x));	
-		pointsDirection[7].push_back(Point(x0 - x, y0 + y));// 顺序不正确
-		pointsDirection[4].push_back(Point(x0 - x, y0 - y));	
-		pointsDirection[5].push_back(Point(x0 - y, y0 - x));// 顺序不正确
-		pointsDirection[2].push_back(Point(x0 + y, y0 - x));	
-		pointsDirection[3].push_back(Point(x0 + x, y0 - y));// 顺序不正确
-
 		x++;
 	}
+
+
+// 	pointsDirection[0].push_back(Point(x0 + x, y0 + y));
+// 	pointsDirection[1].push_back(Point(x0 + y, y0 + x));
+// 	pointsDirection[6].push_back(Point(x0 - y, y0 + x));
+// 	pointsDirection[7].push_back(Point(x0 - x, y0 + y));
+// 	pointsDirection[4].push_back(Point(x0 - x, y0 - y));
+// 	pointsDirection[5].push_back(Point(x0 - y, y0 - x));
+// 	pointsDirection[2].push_back(Point(x0 + y, y0 - x));
+// 	pointsDirection[3].push_back(Point(x0 + x, y0 - y));
+// 
+// 	x++;
+// 
+// 	while (x < y)
+// 	{
+// 		if (distance < 0)
+// 		{
+// 			distance += 4 * x + 6;
+// 		}
+// 		else
+// 		{
+// 			distance += 4 * (x - y) + 10;
+// 			y--;
+// 		}
+// 		pointsDirection[0].push_back(Point(x0 + x, y0 + y));	
+// 		pointsDirection[1].push_back(Point(x0 + y, y0 + x));// 顺序不正确
+// 		pointsDirection[6].push_back(Point(x0 - y, y0 + x));	
+// 		pointsDirection[7].push_back(Point(x0 - x, y0 + y));// 顺序不正确
+// 		pointsDirection[4].push_back(Point(x0 - x, y0 - y));	
+// 		pointsDirection[5].push_back(Point(x0 - y, y0 - x));// 顺序不正确
+// 		pointsDirection[2].push_back(Point(x0 + y, y0 - x));	
+// 		pointsDirection[3].push_back(Point(x0 + x, y0 - y));// 顺序不正确
+// 
+// 		x++;
+// 	}
 
 	// 因为对称性，有4个组的点旋转顺序并不正确，需要调整顺序
 	for (int i = 0; i < pointsDirection[1].size() / 2; i++)
@@ -1088,3 +1089,132 @@ void czh_labeling_backup(Mat & src, Mat & dst)
 	srcImage.copyTo(dst);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//							霍夫变换所需结构								////
+struct LinePolar															////
+{																			////
+	float rho;																////
+	float angle;															////
+};																			////
+																			////
+struct hough_cmp_gt															////
+{																			////
+	hough_cmp_gt(const int* _aux) : aux(_aux) {}							////
+	bool operator()(int l1, int l2) const									////
+	{																		////
+		return aux[l1] > aux[l2] || (aux[l1] == aux[l2] && l1 < l2);		////
+	}																		////
+	const int* aux;															////
+};																			////
+////////////////////////////////////////////////////////////////////////////////
+
+void czh_HoughLinesStandard(const Mat & img, float rho, float theta, int threshold, std::vector<Vec2f>& lines, int linesMax, double min_theta, double max_theta)
+{
+	// 此函数是OpenCV里的标准霍夫线变换，并非本人所编写，放置于此便于学习与查找
+	//统计局部极值的个数
+	int i, j;
+	float irho = 1 / rho;
+
+	CV_Assert(img.type() == CV_8UC1);	// 检测图像是否为单通道
+
+										//存放图像数据
+	const uchar* image = img.ptr();
+	//步长，宽，高
+	int step = (int)img.step;
+	int width = img.cols;
+	int height = img.rows;
+
+	if (max_theta < min_theta) {
+		CV_Error(CV_StsBadArg, "max_theta must be greater than min_theta");
+	}
+	//利用theta和rho这两个分辨率，计算hough图的高宽
+	int numangle = cvRound((max_theta - min_theta) / theta);
+	int numrho = cvRound(((width + height) * 2 + 1) / rho);
+
+#if defined HAVE_IPP && !defined(HAVE_IPP_ICV_ONLY) && IPP_VERSION_X100 >= 810 && IPP_DISABLE_BLOCK
+	CV_IPP_CHECK()
+	{
+		IppiSize srcSize = { width, height };
+		IppPointPolar delta = { rho, theta };
+		IppPointPolar dstRoi[2] = { { (Ipp32f)-(width + height), (Ipp32f)min_theta },{ (Ipp32f)(width + height), (Ipp32f)max_theta } };
+		int bufferSize;
+		int nz = countNonZero(img);
+		int ipp_linesMax = std::min(linesMax, nz*numangle / threshold);
+		int linesCount = 0;
+		lines.resize(ipp_linesMax);
+		IppStatus ok = ippiHoughLineGetSize_8u_C1R(srcSize, delta, ipp_linesMax, &bufferSize);
+		Ipp8u* buffer = ippsMalloc_8u(bufferSize);
+		if (ok >= 0) ok = ippiHoughLine_Region_8u32f_C1R(image, step, srcSize, (IppPointPolar*)&lines[0], dstRoi, ipp_linesMax, &linesCount, delta, threshold, buffer);
+		ippsFree(buffer);
+		if (ok >= 0)
+		{
+			lines.resize(linesCount);
+			CV_IMPL_ADD(CV_IMPL_IPP);
+			return;
+		}
+		lines.clear();
+		setIppErrorStatus();
+	}
+#endif
+
+	//_accum是存放hough图中累积值，及对应hough图的二维矩阵
+	//_sort_buf是存放hough图局部极值用来排序的
+	AutoBuffer<int> _accum((numangle + 2) * (numrho + 2));
+	std::vector<int> _sort_buf;
+
+	//计算离散的sin(theta)和cos(theta)
+	AutoBuffer<float> _tabSin(numangle);
+	AutoBuffer<float> _tabCos(numangle);
+	int *accum = _accum;
+	float *tabSin = _tabSin, *tabCos = _tabCos;
+
+	memset(accum, 0, sizeof(accum[0]) * (numangle + 2) * (numrho + 2));	//内存赋值为零
+
+	float ang = static_cast<float>(min_theta);
+	for (int n = 0; n < numangle; ang += theta, n++)
+	{
+		tabSin[n] = (float)(sin((double)ang) * irho);
+		tabCos[n] = (float)(cos((double)ang) * irho);
+	}
+
+	// stage 1. fill accumulator
+	for (i = 0; i < height; i++)
+		for (j = 0; j < width; j++)
+		{
+			if (image[i * step + j] != 0)
+				for (int n = 0; n < numangle; n++)
+				{
+					int r = cvRound(j * tabCos[n] + i * tabSin[n]);
+					r += (numrho - 1) / 2;
+					accum[(n + 1) * (numrho + 2) + r + 1]++;
+				}
+		}
+
+	// stage 2. find local maximums
+	for (int r = 0; r < numrho; r++)
+		for (int n = 0; n < numangle; n++)
+		{
+			int base = (n + 1) * (numrho + 2) + r + 1;
+			if (accum[base] > threshold &&
+				accum[base] > accum[base - 1] && accum[base] >= accum[base + 1] &&
+				accum[base] > accum[base - numrho - 2] && accum[base] >= accum[base + numrho + 2])
+				_sort_buf.push_back(base);
+		}
+
+	// stage 3. sort the detected lines by accumulator value
+	std::sort(_sort_buf.begin(), _sort_buf.end(), hough_cmp_gt(accum));
+
+	// stage 4. store the first min(total,linesMax) lines to the output buffer
+	linesMax = linesMax > (int)_sort_buf.size() ? linesMax : (int)_sort_buf.size();
+	double scale = 1. / (numrho + 2);
+	for (i = 0; i < linesMax; i++)
+	{
+		LinePolar line;
+		int idx = _sort_buf[i];
+		int n = cvFloor(idx*scale) - 1;
+		int r = idx - (n + 1)*(numrho + 2) - 1;
+		line.rho = (r - (numrho - 1)*0.5f) * rho;
+		line.angle = static_cast<float>(min_theta) + n * theta;
+		lines.push_back(Vec2f(line.rho, line.angle));
+	}
+}
