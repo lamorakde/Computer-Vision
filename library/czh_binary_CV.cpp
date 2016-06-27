@@ -582,12 +582,6 @@ void czh_extractColor(Mat &srcImage, Mat & dstImage, int color = RED)
 
 void czh_minFilter(Mat &srcImage, Mat & dstImage, int radius)
 {
-	// 该函数输入一个单通道图像，做最小值滤波，窗口大小 size * size
-// 	if ( (srcImage.type() != CV_32FC1) || (srcImage.type() != CV_8UC1))
-// 	{
-// 		cerr << "输入图像必须为单通道图像.\n";
-// 		return;
-// 	}
 	Mat src;
 	srcImage.copyTo(src);
 	Mat dst(srcImage.size(), srcImage.type(), Scalar::all(0));
@@ -615,6 +609,33 @@ void czh_minFilter(Mat &srcImage, Mat & dstImage, int radius)
 				dst.at<uchar>(i, j) = minValue;
 			}
 		}
+		
+		for (int i = radius; i < src.rows - radius; i++)
+		{
+			for (int j = radius - 1; j >= 0; j--)
+			{
+				dst.at<uchar>(i, j) = dst.at<uchar>(i, j + 1);
+			}
+
+			for (int j = src.cols - radius; j < src.cols; j++)
+			{
+				dst.at<uchar>(i, j) = dst.at<uchar>(i, j - 1);
+			}
+		}
+
+		for (int j = 0; j < src.cols; j++)
+		{
+			for (int i = radius - 1; i >= 0; i--)
+			{
+				dst.at<uchar>(i, j) = dst.at<uchar>(i + 1, j);
+			}
+
+			for (int i = src.rows - radius; i < src.rows; i++)
+			{
+				dst.at<uchar>(i, j) = dst.at<uchar>(i - 1, j);
+			}
+		}
+
 		break;
 	}
 		
@@ -638,6 +659,32 @@ void czh_minFilter(Mat &srcImage, Mat & dstImage, int radius)
 					}
 				}
 				dst.at<float>(i, j) = minValue;
+			}
+		}
+
+		for (int i = radius; i < src.rows - radius; i++)
+		{
+			for (int j = radius - 1; j >= 0; j--)
+			{
+				dst.at<float>(i, j) = dst.at<float>(i, j + 1);
+			}
+
+			for (int j = src.cols - radius; j < src.cols; j++)
+			{
+				dst.at<float>(i, j) = dst.at<float>(i, j - 1);
+			}
+		}
+
+		for (int j = 0; j < src.cols; j++)
+		{
+			for (int i = radius - 1; i >= 0; i--)
+			{
+				dst.at<float>(i, j) = dst.at<float>(i + 1, j);
+			}
+
+			for (int i = src.rows - radius; i < src.rows; i++)
+			{
+				dst.at<float>(i, j) = dst.at<float>(i - 1, j);
 			}
 		}
 		break;
@@ -887,12 +934,124 @@ void czh_labeling(Mat & src, Mat & dst)
 	vector<int> labelSet;
 	labelSet.push_back(0);
 	labelSet.push_back(1);
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////
+	////////									处理第一行						    			///////
+	////////									   开始							    			///////
+	data_cur = srcImage.ptr<uchar>(0);
+
+	if (data_cur[0] != 0)	// 如果第一行的第一个元素不为0，则给它一个label
+	{
+		labelSet.push_back(++label);	// 则在 labelSet 中新添加一个 label
+		labelSet[label] = label;		// 给这个位置的 label 赋值
+		data_cur[0] = label;			// 修改源图像素灰度值为 label
+	}
+
+	for (int j = 1; j < srcImage.cols; j++)
+	{
+		if (data_cur[j] == 0)
+		{	// 如果当前像素不是目标像素，则跳过该像素
+			continue;
+		}
+		int left = data_cur[j - 1];	// 左点灰度值
+		int cnt = 0;		// 用于计算左点和上点一个有多少个有效值
+		int neighborLabels[2];
+		if (left != 0)		// 如果左点是有效值
+		{
+			neighborLabels[cnt++] = left;	// 把左点灰度值赋给 neighborLabels 中一个元素
+		}
+
+		if (cnt == 0)	// 如果左点为0
+		{
+			labelSet.push_back(++label);	// 则在 labelSet 中新添加一个 label
+			labelSet[label] = label;		// 给这个位置的 label 赋值
+			data_cur[j] = label;			// 修改源图像素灰度值为 label
+			continue;						// 继续下一次循环
+		}
+		int smallestLabel = neighborLabels[0];				// 如果左点和上点只有一个有效值，那么就选择该有效值的 label 作为小的label
+		data_cur[j] = smallestLabel;	// 将源图像该点灰度值赋值为小的 label
+
+		// 保存最小等价表  
+		for (int k = 0; k < cnt; k++)
+		{
+			int tempLabel = neighborLabels[k];
+			int & oldSmallestLabel = labelSet[tempLabel];
+			if (oldSmallestLabel > smallestLabel)
+			{
+				labelSet[oldSmallestLabel] = smallestLabel;
+			}
+			else if (oldSmallestLabel < smallestLabel)
+			{
+				labelSet[smallestLabel] = oldSmallestLabel;
+			}
+		}
+	}
+	////////									处理第一行						    			///////
+	////////									   结束							    			///////
+	///////////////////////////////////////////////////////////////////////////////////////////////////
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////
+	////////									处理中间						    			///////
+	////////									  开始							    			///////
 	for (int i = 1; i < height; i++)
 	{
 		data_cur = srcImage.ptr<uchar>(i);		// 当前行行指针
 		data_prev = srcImage.ptr<uchar>(i - 1);	// 上一行行指针
 
-		for (int j = 1; j < width; j++)
+		// 处理该行第一个元素
+		if (data_cur[0] != 0)	// 如果该一行的第一个元素不为0，检查它的顶部元素，如果顶部元素未被标记，则给它一个label
+		{
+			int up = data_prev[0];		// 上点灰度值
+			int neighborLabels[2];		// 用于存储左点和上点的灰度值
+			int cnt = 0;		// 用于计算左点和上点一个有多少个有效值
+			if (up != 0)		// 如果上点是有效值
+			{
+				neighborLabels[cnt++] = up;		// 把上点灰度值赋给 neighborLabels 中另一个元素
+			};
+			if (cnt == 0)	// 如果上点为0，给当前点一个 label
+			{
+				labelSet.push_back(++label);	// 则在 labelSet 中新添加一个 label
+				labelSet[label] = label;		// 给这个位置的 label 赋值
+				data_cur[0] = label;			// 修改源图像素灰度值为 label
+			}
+			else
+			{
+				int smallestLabel = neighborLabels[0];				// 如果左点和上点只有一个有效值，那么就选择该有效值的 label 作为小的label
+				data_cur[0] = smallestLabel;	// 将源图像该点灰度值赋值为小的 label
+
+				// 保存最小等价表  
+				for (int k = 0; k < cnt; k++)
+				{
+					int tempLabel = neighborLabels[k];
+					int & oldSmallestLabel = labelSet[tempLabel];
+					if (oldSmallestLabel > smallestLabel)
+					{
+						labelSet[oldSmallestLabel] = smallestLabel;
+					}
+					else if (oldSmallestLabel < smallestLabel)
+					{
+						labelSet[smallestLabel] = oldSmallestLabel;
+					}
+				}
+				// 每经过一个目标点，且它左点或上点有标记的话，就更新连通域等效最小 label 
+				// 将等效连通域中的 label 替换为连通域中最小 label 
+				// 所以每次遍历一个新点，连通域中的各个 label 总是该连通域中最小的 label
+				for (size_t i = 2; i < labelSet.size(); i++)
+				{
+					int curLabel = labelSet[i];
+					int preLabel = labelSet[curLabel];
+					while (preLabel != curLabel)
+					{
+						curLabel = preLabel;
+						preLabel = labelSet[preLabel];
+					}
+					labelSet[i] = curLabel;
+				}
+			}
+		}
+
+		// 处理每一行的后面的元素
+		for (int j = 1; j < srcImage.cols; j++)
 		{	// 遍历图中每一个像素
 			if (data_cur[j] == 0)
 			{	// 如果当前像素不是目标像素，则跳过该像素
@@ -924,7 +1083,7 @@ void czh_labeling(Mat & src, Mat & dst)
 			}
 			data_cur[j] = smallestLabel;	// 将源图像该点灰度值赋值为小的 label
 
-											// 保存最小等价表  
+			// 保存最小等价表  
 			for (int k = 0; k < cnt; k++)
 			{
 				int tempLabel = neighborLabels[k];
@@ -946,7 +1105,8 @@ void czh_labeling(Mat & src, Mat & dst)
 			{
 				int curLabel = labelSet[i];
 				int preLabel = labelSet[curLabel];
-				while (preLabel != curLabel) {
+				while (preLabel != curLabel)
+				{
 					curLabel = preLabel;
 					preLabel = labelSet[preLabel];
 				}
@@ -955,33 +1115,160 @@ void czh_labeling(Mat & src, Mat & dst)
 		}
 	}
 
-	// 更新等价对列表,将最小标号给重复区域  
-	for (size_t i = 2; i < labelSet.size(); i++)
-	{
-		int curLabel = labelSet[i];
-		int preLabel = labelSet[curLabel];
-		while (preLabel != curLabel) {
-			curLabel = preLabel;
-			preLabel = labelSet[preLabel];
-		}
-		labelSet[i] = curLabel;
-	}
+	////////									处理中间						    			///////
+	////////									  结束							    			///////
+	///////////////////////////////////////////////////////////////////////////////////////////////////
 
-	///////////////////////////////////////////////////////////
-	//				     second pass                         //
-	///////////////////////////////////////////////////////////
 
-	// 将图中各个像素点 label 换成同连通域最小 label
-	for (int i = 0; i < height; i++)
+	///////////////////////////////////////////////////////////////////////////////////////////////////
+	////////								处理最后一行						    			///////
+	////////									开始							    			///////
+	data_cur = srcImage.ptr<uchar>(srcImage.rows - 1);
+	data_prev = srcImage.ptr<uchar>(srcImage.rows - 2);	// 上一行行指针
+
+	if (data_cur[0] != 0)	// 如果该一行的第一个元素不为0，检查它的顶部元素，如果顶部元素未被标记，则给它一个label
 	{
-		data_cur = srcImage.ptr<uchar>(i);		// 当前行行指针
-		for (int j = 0; j < width; j++)
+		int up = data_prev[0];		// 上点灰度值
+		int neighborLabels[2];		// 用于存储左点和上点的灰度值
+		int cnt = 0;		// 用于计算左点和上点一个有多少个有效值
+		if (up != 0)		// 如果上点是有效值
 		{
-			data_cur[j] = labelSet[data_cur[j]];
+			neighborLabels[cnt++] = up;		// 把上点灰度值赋给 neighborLabels 中另一个元素
+		};
+		if (cnt == 0)	// 如果上点为0，给当前点一个 label
+		{
+			labelSet.push_back(++label);	// 则在 labelSet 中新添加一个 label
+			labelSet[label] = label;		// 给这个位置的 label 赋值
+			data_cur[0] = label;			// 修改源图像素灰度值为 label
+		}
+		else
+		{
+			int smallestLabel = neighborLabels[0];				// 如果左点和上点只有一个有效值，那么就选择该有效值的 label 作为小的label
+			data_cur[0] = smallestLabel;	// 将源图像该点灰度值赋值为小的 label
+
+			// 保存最小等价表  
+			for (int k = 0; k < cnt; k++)
+			{
+				int tempLabel = neighborLabels[k];
+				int & oldSmallestLabel = labelSet[tempLabel];
+				if (oldSmallestLabel > smallestLabel)
+				{
+					labelSet[oldSmallestLabel] = smallestLabel;
+				}
+				else if (oldSmallestLabel < smallestLabel)
+				{
+					labelSet[smallestLabel] = oldSmallestLabel;
+				}
+			}
+			// 每经过一个目标点，且它左点或上点有标记的话，就更新连通域等效最小 label 
+			// 将等效连通域中的 label 替换为连通域中最小 label 
+			// 所以每次遍历一个新点，连通域中的各个 label 总是该连通域中最小的 label
+			for (size_t i = 2; i < labelSet.size(); i++)
+			{
+				int curLabel = labelSet[i];
+				int preLabel = labelSet[curLabel];
+				while (preLabel != curLabel)
+				{
+					curLabel = preLabel;
+					preLabel = labelSet[preLabel];
+				}
+				labelSet[i] = curLabel;
+			}
 		}
 	}
-	
-	srcImage.copyTo(dst);
+
+	for (int j = 1; j < srcImage.cols; j++)
+	{
+		if (data_cur[j] == 0)
+		{	// 如果当前像素不是目标像素，则跳过该像素
+			continue;
+		}
+		int left = data_cur[j - 1];	// 左点灰度值
+		int up = data_prev[j];		// 上点灰度值
+		int neighborLabels[2];		// 用于存储左点和上点的灰度值
+		int cnt = 0;		// 用于计算左点和上点一个有多少个有效值
+		if (left != 0)		// 如果左点是有效值
+		{
+			neighborLabels[cnt++] = left;	// 把左点灰度值赋给 neighborLabels 中一个元素
+		}
+		if (up != 0)		// 如果上点是有效值
+		{
+			neighborLabels[cnt++] = up;		// 把上点灰度值赋给 neighborLabels 中另一个元素
+		}
+		if (cnt == 0)	// 如果左点和上点都为0
+		{
+			labelSet.push_back(++label);	// 则在 labelSet 中新添加一个 label
+			labelSet[label] = label;		// 给这个位置的 label 赋值
+			data_cur[j] = label;			// 修改源图像素灰度值为 label
+			continue;						// 继续下一次循环
+		}
+		int smallestLabel = neighborLabels[0];				// 如果左点和上点只有一个有效值，那么就选择该有效值的 label 作为小的label
+		if (cnt == 2 && neighborLabels[1] < smallestLabel)	// 如果左点和上点都有有效值，选择小的一个 label
+		{
+			smallestLabel = neighborLabels[1];
+		}
+		data_cur[j] = smallestLabel;	// 将源图像该点灰度值赋值为小的 label
+
+		// 保存最小等价表  
+		for (int k = 0; k < cnt; k++)
+		{
+			int tempLabel = neighborLabels[k];
+			int & oldSmallestLabel = labelSet[tempLabel];
+			if (oldSmallestLabel > smallestLabel)
+			{
+				labelSet[oldSmallestLabel] = smallestLabel;
+			}
+			else if (oldSmallestLabel < smallestLabel)
+			{
+				labelSet[smallestLabel] = oldSmallestLabel;
+			}
+		}
+		// 每经过一个目标点，且它左点或上点有标记的话，就更新连通域等效最小 label 
+		// 将等效连通域中的 label 替换为连通域中最小 label 
+		// 所以每次遍历一个新点，连通域中的各个 label 总是该连通域中最小的 label
+		for (size_t i = 2; i < labelSet.size(); i++)
+		{
+			int curLabel = labelSet[i];
+			int preLabel = labelSet[curLabel];
+			while (preLabel != curLabel)
+			{
+				curLabel = preLabel;
+				preLabel = labelSet[preLabel];
+			}
+			labelSet[i] = curLabel;
+		}
+	}
+////////								处理最后一行						    			///////
+////////									结束							    			///////
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+		// 更新等价对列表,将最小标号给重复区域  
+		for (size_t i = 2; i < labelSet.size(); i++)
+		{
+			int curLabel = labelSet[i];
+			int preLabel = labelSet[curLabel];
+			while (preLabel != curLabel) {
+				curLabel = preLabel;
+				preLabel = labelSet[preLabel];
+			}
+			labelSet[i] = curLabel;
+		}
+
+		///////////////////////////////////////////////////////////
+		//				     second pass                         //
+		///////////////////////////////////////////////////////////
+
+		// 将图中各个像素点 label 换成同连通域最小 label
+		for (int i = 0; i < srcImage.rows; i++)
+		{
+			data_cur = srcImage.ptr<uchar>(i);		// 当前行行指针
+			for (int j = 0; j < srcImage.cols; j++)
+			{
+				data_cur[j] = labelSet[data_cur[j]];
+			}
+		}
+
+		srcImage.copyTo(dst);
 }
 
 void czh_labeling_backup(Mat & src, Mat & dst)
@@ -1089,32 +1376,26 @@ void czh_labeling_backup(Mat & src, Mat & dst)
 	srcImage.copyTo(dst);
 }
 
+
 ////////////////////////////////////////////////////////////////////////////////
 //							霍夫变换所需结构								////
 struct LinePolar															////
 {																			////
 	float rho;																////
 	float angle;															////
-};																			////
-																			////
-struct hough_cmp_gt															////
-{																			////
-	hough_cmp_gt(const int* _aux) : aux(_aux) {}							////
-	bool operator()(int l1, int l2) const									////
-	{																		////
-		return aux[l1] > aux[l2] || (aux[l1] == aux[l2] && l1 < l2);		////
-	}																		////
-	const int* aux;															////
-};																			////
+};																			////																		////
 ////////////////////////////////////////////////////////////////////////////////
 
-void czh_HoughLinesStandard(const Mat & img, float rho, float theta, int threshold, std::vector<Vec2f>& lines, int linesMax, double min_theta, double max_theta)
+void czh_myHoughLines(const Mat & img, std::vector<Vec2f>& lines, float rho, float theta, int thresholdTotal, int thresholdRho, int thresholdAngle)
 {
-	// 此函数是OpenCV里的标准霍夫线变换，并非本人所编写，放置于此便于学习与查找
-	//统计局部极值的个数
+	// 此函数是根据OpenCV里的标准霍夫线变换改编的，核心算法并未改变，但是修改了判定条件
+	// # 1 该函数中首先按照霍夫变换将直线参数保持在叠加器中（或者是在霍夫平面之中）
+	// # 2 对霍夫平面做连通域标记
+	// # 3 对每个连通域求一个重心，输出到目标 lines 向量中
+	// # 4 然后归并参数对相近的直线
+
 	int i, j;
 	float irho = 1 / rho;
-
 	CV_Assert(img.type() == CV_8UC1);	// 检测图像是否为单通道
 
 										//存放图像数据
@@ -1124,43 +1405,12 @@ void czh_HoughLinesStandard(const Mat & img, float rho, float theta, int thresho
 	int width = img.cols;
 	int height = img.rows;
 
-	if (max_theta < min_theta) {
-		CV_Error(CV_StsBadArg, "max_theta must be greater than min_theta");
-	}
 	//利用theta和rho这两个分辨率，计算hough图的高宽
-	int numangle = cvRound((max_theta - min_theta) / theta);
+	int numangle = cvRound(CV_PI / theta);
 	int numrho = cvRound(((width + height) * 2 + 1) / rho);
 
-#if defined HAVE_IPP && !defined(HAVE_IPP_ICV_ONLY) && IPP_VERSION_X100 >= 810 && IPP_DISABLE_BLOCK
-	CV_IPP_CHECK()
-	{
-		IppiSize srcSize = { width, height };
-		IppPointPolar delta = { rho, theta };
-		IppPointPolar dstRoi[2] = { { (Ipp32f)-(width + height), (Ipp32f)min_theta },{ (Ipp32f)(width + height), (Ipp32f)max_theta } };
-		int bufferSize;
-		int nz = countNonZero(img);
-		int ipp_linesMax = std::min(linesMax, nz*numangle / threshold);
-		int linesCount = 0;
-		lines.resize(ipp_linesMax);
-		IppStatus ok = ippiHoughLineGetSize_8u_C1R(srcSize, delta, ipp_linesMax, &bufferSize);
-		Ipp8u* buffer = ippsMalloc_8u(bufferSize);
-		if (ok >= 0) ok = ippiHoughLine_Region_8u32f_C1R(image, step, srcSize, (IppPointPolar*)&lines[0], dstRoi, ipp_linesMax, &linesCount, delta, threshold, buffer);
-		ippsFree(buffer);
-		if (ok >= 0)
-		{
-			lines.resize(linesCount);
-			CV_IMPL_ADD(CV_IMPL_IPP);
-			return;
-		}
-		lines.clear();
-		setIppErrorStatus();
-	}
-#endif
-
 	//_accum是存放hough图中累积值，及对应hough图的二维矩阵
-	//_sort_buf是存放hough图局部极值用来排序的
 	AutoBuffer<int> _accum((numangle + 2) * (numrho + 2));
-	std::vector<int> _sort_buf;
 
 	//计算离散的sin(theta)和cos(theta)
 	AutoBuffer<float> _tabSin(numangle);
@@ -1170,19 +1420,25 @@ void czh_HoughLinesStandard(const Mat & img, float rho, float theta, int thresho
 
 	memset(accum, 0, sizeof(accum[0]) * (numangle + 2) * (numrho + 2));	//内存赋值为零
 
-	float ang = static_cast<float>(min_theta);
+	float ang = 0;
 	for (int n = 0; n < numangle; ang += theta, n++)
 	{
 		tabSin[n] = (float)(sin((double)ang) * irho);
 		tabCos[n] = (float)(cos((double)ang) * irho);
 	}
 
-	// stage 1. fill accumulator
+
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	//																						   //
+	// 	      # 1 首先按照霍夫变换将直线参数保持在叠加器中（或者是在霍夫平面之中）	   		   //
+	//																						   //
+	/////////////////////////////////////////////////////////////////////////////////////////////
+
 	for (i = 0; i < height; i++)
 		for (j = 0; j < width; j++)
-		{
-			if (image[i * step + j] != 0)
-				for (int n = 0; n < numangle; n++)
+		{	// 遍历源图像每一个像素
+			if (image[i * step + j] != 0)	// 如果该像素是前景像素
+				for (int n = 0; n < numangle; n++)	// 则绘制它的霍夫变换曲线，并储存在相应位置
 				{
 					int r = cvRound(j * tabCos[n] + i * tabSin[n]);
 					r += (numrho - 1) / 2;
@@ -1190,31 +1446,290 @@ void czh_HoughLinesStandard(const Mat & img, float rho, float theta, int thresho
 				}
 		}
 
-	// stage 2. find local maximums
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	//																						   //
+	//			                    	# 2 对霍夫平面做连通域标记				     		   //
+	//																						   //
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	Mat maskImage(numangle + 2, numrho + 2, CV_8UC1, Scalar::all(0));
+
 	for (int r = 0; r < numrho; r++)
 		for (int n = 0; n < numangle; n++)
 		{
 			int base = (n + 1) * (numrho + 2) + r + 1;
-			if (accum[base] > threshold &&
-				accum[base] > accum[base - 1] && accum[base] >= accum[base + 1] &&
-				accum[base] > accum[base - numrho - 2] && accum[base] >= accum[base + numrho + 2])
-				_sort_buf.push_back(base);
+			if (accum[base] > thresholdTotal)	// 对于霍夫平面上的参数，如果某一参数对的值超过阈值，则在 mask 图像中相应的点置为白色
+			{
+				maskImage.at<uchar>(n + 1, r + 1) = 255; // 注意这里为了和原霍夫变换函数保持一致，mask 图像尺寸和 accum 尺寸一样
+			}
 		}
 
-	// stage 3. sort the detected lines by accumulator value
-	std::sort(_sort_buf.begin(), _sort_buf.end(), hough_cmp_gt(accum));
+	czh_labeling(maskImage, maskImage);
 
-	// stage 4. store the first min(total,linesMax) lines to the output buffer
-	linesMax = linesMax > (int)_sort_buf.size() ? linesMax : (int)_sort_buf.size();
-	double scale = 1. / (numrho + 2);
-	for (i = 0; i < linesMax; i++)
-	{
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	//																						   //
+	//				# 3 对每个连通域求一个重心，输出到目标 lines 向量中						   //
+	//																						   //
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	// 维持一个大小为256的矢量，每一个矢量元素（子矢量）是一个点矢量，用于存放像素灰度值相同的点
+	vector<vector<Point>> pointsSet(256);	// 比如像素灰度为 1 的点都存放于 pointSet[1] 之中
+
+	Point curPoint;	// 当前点Point对象
+	int curValue;	// 当前点灰度值
+	MatIterator_<uchar> itBegin, itEnd;	// 图像迭代器
+
+	for (itBegin = maskImage.begin<uchar>(), itEnd = maskImage.end<uchar>(); itBegin != itEnd; itBegin++)
+	{	// 遍历标记图像中每一个像素，将相同像素的点放进一个矢量
+		if ((*itBegin) != 0)	// 如果当前点灰度值不为零
+		{
+			curValue = (*itBegin);	// 当前点灰度值
+			curPoint = itBegin.pos();	// 当前点Point对象
+			pointsSet[curValue].push_back(curPoint);	// 把当前点压入对应矢量中
+		}
+	}
+
+	for (int i = 0; i < pointsSet.size(); i++)
+	{	// 遍历 pointsSet 的所有256个子矢量
+
+		if (pointsSet[i].size() == 0)
+		{	// 如果某个子矢量中一个点都没有，则跳过
+			continue;
+		}
+
+		// 初始化
+		int nCur, rCur;
+		int total_n_values = 0, total_r_values = 0, total_values = 0;
+
+		for (int j = 0; j < pointsSet[i].size(); j++)
+		{	// 遍历每一个子矢量中的点元素,求得该连通域的 r 值和 n 值
+			nCur = pointsSet[i][j].y - 1;
+			rCur = pointsSet[i][j].x - 1;
+			total_n_values += accum[(nCur + 1) * (numrho + 2) + rCur + 1] * nCur;
+			total_r_values += accum[(nCur + 1) * (numrho + 2) + rCur + 1] * rCur;
+			total_values += accum[(nCur + 1) * (numrho + 2) + rCur + 1];
+		}
+
+		// 求得该灰度值点群的重心
+		nCur = cvRound(total_n_values / total_values);
+		rCur = cvRound(total_r_values / total_values);
+
 		LinePolar line;
-		int idx = _sort_buf[i];
-		int n = cvFloor(idx*scale) - 1;
-		int r = idx - (n + 1)*(numrho + 2) - 1;
-		line.rho = (r - (numrho - 1)*0.5f) * rho;
-		line.angle = static_cast<float>(min_theta) + n * theta;
+		line.rho = (rCur - (numrho - 1)*0.5f) * rho;
+		line.angle = nCur * theta;
 		lines.push_back(Vec2f(line.rho, line.angle));
 	}
+
+
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	//																						   //
+	//								# 4 然后归并参数对相近的直线				     		   //
+	//																						   //
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	// 在已经求得的直线参数对向量中遍历
+	for (size_t i = 0; i < lines.size(); i++)
+	{
+		float rhoCur = lines[i][0];
+		float angleCur = lines[i][1];
+
+		float rhoTotal = rhoCur;
+		float angleTotal = angleCur;
+		int numProche = 1;
+
+		// 如果有其他的直线参数对和当前直线参数对相近，则求得他们的平均值赋给当前参数对，其他相近参数对置零
+		for (size_t j = i + 1; j < lines.size(); j++)
+		{	
+			if ( (abs(lines[j][0] - rhoCur) < thresholdRho) && ( abs(lines[j][1] - angleCur) / CV_PI * 180 < thresholdAngle))
+			{
+				rhoTotal += lines[j][0];
+				angleTotal += lines[j][1];
+				numProche++;
+				lines[j][0] = lines[j][1] = 0;
+			}
+		}
+		
+		lines[i][0] = rhoTotal / numProche;
+		lines[i][1] = angleTotal / numProche;
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	//																						   //
+	//								# 4 然后归并参数对相近的直线				     		   //
+	//																						   //
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	vector<Vec2f> finalLines;
+	Vec2f tempLine;
+	for (size_t i = 0; i < lines.size(); i++)
+	{
+		if ((lines[i][0] == 0) && (lines[i][1] == 0))	// 如果是已经被置零的参数对，则跳过
+			continue;
+		// 否则将该参数对添加到最终向量之中
+		tempLine[0] = lines[i][0];
+		tempLine[1] = lines[i][1];
+		finalLines.push_back(tempLine);
+	}
+
+	lines.clear();	// 清空原向量
+	lines = finalLines;	// 将最终项链赋给原向量
+}
+
+void czh_centerOfGravity(Mat & labelledImage, Mat & dstImage, vector<Point> & centerPoints)
+{
+	// 该函数针对已经被连通域标记处理过的图像寻找每个连通域的重心，输出至 dstImage 之中,并把重心坐标输出到 centerPoints 之中
+
+	Mat tempImage(labelledImage.size(), CV_8UC1, Scalar::all(0));
+	// 维持一个大小为256的矢量，每一个矢量元素（子矢量）是一个点矢量，用于存放像素灰度值相同的点
+	vector<vector<Point>> pointsSet(256);	// 比如像素灰度为 1 的点都存放于 pointSet[1] 之中
+
+	Point curPoint;	// 当前点Point对象
+	int curValue;	// 当前点灰度值
+	MatIterator_<uchar> itBegin, itEnd;	// 图像迭代器
+
+	for (itBegin = labelledImage.begin<uchar>(), itEnd = labelledImage.end<uchar>(); itBegin != itEnd; itBegin++)
+	{	// 遍历标记图像中每一个像素，将相同像素的点放进一个矢量
+		if ((*itBegin) != 0)	// 如果当前点灰度值不为零
+		{
+			curValue = (*itBegin);	// 当前点灰度值
+			curPoint = itBegin.pos();	// 当前点Point对象
+			pointsSet[curValue].push_back(curPoint);	// 把当前点压入对应矢量中
+		}
+	}
+
+	vector<Point> cornerCenterPointSet;	// 准备最终的交点点矢量
+
+	for (int i = 0; i < pointsSet.size(); i++)
+	{	// 遍历 pointsSet 的所有256个子矢量
+		if (pointsSet[i].size() == 0)
+		{	// 如果某个子矢量中一个点都没有，则跳过
+			continue;
+		}
+
+		// 初始化 x,y 值总和
+		int total_x = 0;
+		int total_y = 0;;
+		int total_points = pointsSet[i].size();// 该灰度值有多少个点
+
+		for (int j = 0; j < pointsSet[i].size(); j++)
+		{	// 遍历每一个子矢量中的点元素,求得x总值和y总值
+			total_x += pointsSet[i][j].x;
+			total_y += pointsSet[i][j].y;
+		}
+
+		// 求得该灰度值点群的重心
+		int x = total_x / total_points;
+		int y = total_y / total_points;
+		cornerCenterPointSet.push_back(Point(x, y));	// 把该重心压入 cornerPointSet 矢量中,以备以后使用
+		tempImage.at<uchar>(y, x) = 255;	// 把最终图像 Mat 对象中把角点置为白色
+	}
+
+	dstImage = tempImage;
+	vector<Point>().swap(centerPoints);	// 清空输出向量
+	centerPoints = cornerCenterPointSet;// 将点坐标向量赋给输出向量
+}
+
+void czh_bwAreaOpen(Mat & srcImage, Mat & dstImage, int zoneHeight, int zoneWidth, int threshold)
+{
+	// 	该函数实现了 Matlab 中 bwareaopen 函数的功能：对一个二值图像去噪，去除连通域面积小于 threshold 的点
+
+	Mat tempImage, tempRectImage;
+	srcImage.copyTo(tempImage);
+
+	int numRows = srcImage.rows / zoneHeight;
+	int numCols = srcImage.cols / zoneWidth;
+
+	Point curPoint;	// 当前点Point对象
+	int curValue;	// 当前点灰度值
+	MatIterator_<uchar> itBegin, itEnd;	// 图像迭代器
+
+	for (int i = 0; i < numRows; i++)
+		for (int j = 0; j < numCols; j++)
+		{
+			// 针对每一个子块儿做连通域标记
+			tempRectImage = srcImage(Rect(j*zoneWidth, i*zoneHeight, zoneWidth, zoneHeight));
+			czh_labeling(tempRectImage, tempRectImage);
+
+			// 维持一个大小为256的矢量，每一个矢量元素（子矢量）是一个点矢量，用于存放像素灰度值相同的点
+			vector<vector<Point>> pointsSet(256);	// 比如像素灰度为 1 的点都存放于 pointSet[1] 之中
+
+			for (itBegin = tempRectImage.begin<uchar>(), itEnd = tempRectImage.end<uchar>(); itBegin != itEnd; itBegin++)
+			{	// 遍历标记图像中每一个像素，将相同像素的点放进一个矢量
+				if ((*itBegin) != 0)	// 如果当前点灰度值不为零
+				{
+					curValue = (*itBegin);	// 当前点灰度值
+					curPoint = itBegin.pos();	// 当前点Point对象
+					pointsSet[curValue].push_back(curPoint);	// 把当前点压入对应矢量中
+				}
+			}
+
+			for (int itPts = 0; itPts < pointsSet.size(); itPts++)
+			{	// 遍历 pointsSet 的所有256个子矢量
+				if (pointsSet[itPts].size() == 0)
+				{	// 如果某个子矢量中一个点都没有，则跳过
+					continue;
+				}
+
+				if (pointsSet[itPts].size() < threshold)
+				{	// 如果某个连通域面积小于阈值，则把该连通域上的点置为黑色
+					for (int nPts = 0; nPts < pointsSet[itPts].size(); nPts++)
+						tempImage.at<uchar>(pointsSet[itPts][nPts].y + i*zoneHeight, pointsSet[itPts][nPts].x + j*zoneWidth) = 0;
+				}
+			}
+		}
+	dstImage = tempImage;
+}
+
+void czh_guidedFilter(Mat & srcImage, Mat & guidanceImage, Mat & dstImage, int radius, float epsilon, int outputType)
+{
+	// 该函数实现了何凯明博士的 guided filter 引导滤波算法
+	CV_Assert(radius >= 2 && epsilon > 0);
+	CV_Assert(srcImage.data != NULL && srcImage.channels() == 1);
+	CV_Assert(guidanceImage.channels() == 1);
+	CV_Assert(srcImage.rows == guidanceImage.rows && srcImage.cols == guidanceImage.cols);
+
+	// 开始算法
+	Mat P, I;
+
+	// 将源图像和引导图像转换为浮点型: 以便于后边的除法运算
+	srcImage.convertTo(I, CV_32F, 1.0 / 255.0);	// 引导图像 I = guidance image
+	srcImage.convertTo(P, CV_32F, 1.0 / 255.0);	// 原图像 P = source image
+
+	//	计算I*p和I*I  
+	Mat image_IP, image_II;
+	multiply(P, I, image_IP);	// image_IP = image I * image P
+	multiply(I, I, image_II);	// image_I2 = image I * image I
+
+	// 滤波窗口大小
+	Size window_size(2 * radius + 1, 2 * radius + 1);
+
+	//计算各种均值  
+	Mat mean_I, mean_P, corr_I, corr_IP;
+	boxFilter(I, mean_I, CV_32F, window_size);	// meanI = mean of input image I
+	boxFilter(P, mean_P, CV_32F, window_size);	// meanP = mean of guidance image P
+	boxFilter(image_II, corr_I, CV_32F, window_size);	// corr_I = mean of image_I2
+	boxFilter(image_IP, corr_IP, CV_32F, window_size);	// corr_IP = mean of image_IP
+
+	//计算Ip的协方差和I的方差  
+	Mat var_I, cov_IP;
+	var_I = corr_I - mean_I.mul(mean_I);
+	cov_IP = corr_IP - mean_I.mul(mean_P);
+
+	// 求 a,b
+	Mat a, b;
+	var_I += epsilon;
+	divide(cov_IP, var_I, a);
+	b = mean_P - a.mul(mean_I);
+
+	//对包含像素i的所有a、b做平均  
+	Mat mean_a, mean_b;
+	boxFilter(a, mean_a, CV_32F, window_size);
+	boxFilter(b, mean_b, CV_32F, window_size);
+
+	// 做最终的计算
+	Mat tempDstImage(I.size(), CV_32F);
+	tempDstImage = mean_a.mul(I) + mean_b;
+
+	dstImage = tempDstImage;	// 将最终结果以 dstImage 参数返回
+	if (outputType == CV_8UC1)
+	{
+		dstImage.convertTo(dstImage, CV_8UC1, 255);	// 转换格式
+	}
+	else if ((outputType == CV_32FC1) || (outputType == CV_32FC1)){}
 }
