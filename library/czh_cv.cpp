@@ -1,6 +1,6 @@
 #include "opencv2/opencv.hpp"
 #include <windows.h>
-#include "czh_binary_CV.h"
+#include "czh_cv.h"
 
 using namespace cv;
 using namespace std;
@@ -971,10 +971,9 @@ void czh_Circle_Profile(const Mat & srcImage, const int x0, const int y0, const 
 		}
 	}
 	imshow("Profile", profileImage);
-
 }
 
-Mat czh_Line_Profile(const Mat & srcImage, Point pt0, Point pt1)
+Mat czh_Line_Profile(const Mat & srcImage, Point pt0, Point pt1, bool sameSize)
 {
 	// 展示以选定的两个点为端点的直线在图中的灰度变化,返回变化图像以
 	vector<Point> linePts;	// 用于存放直线上的点的点向量
@@ -988,7 +987,12 @@ Mat czh_Line_Profile(const Mat & srcImage, Point pt0, Point pt1)
 	}
 
 	int profileHeight = 255;	// profile图像高度
-	int profileWidth = linePts.size() * 6;	// profile 图像宽度
+	int profileWidth;	// profile 图像宽度
+
+	if(!sameSize)
+		profileWidth = linePts.size() * 6;	
+	else profileWidth = linePts.size();
+
 	Mat profileImage(profileHeight, profileWidth, CV_8UC1, Scalar::all(0));
 
 	for (int x = 0; x < linePts.size(); x++)
@@ -996,13 +1000,20 @@ Mat czh_Line_Profile(const Mat & srcImage, Point pt0, Point pt1)
 		int y = profileHeight - valuesOfPoints[x] / 2;
 		for (; y < profileHeight; y++)
 		{
-			profileImage.at<uchar>(y, 4 * x) = 255;
-			profileImage.at<uchar>(y, 4 * x + 1) = 255;
-			profileImage.at<uchar>(y, 4 * x + 2) = 255;
-			profileImage.at<uchar>(y, 4 * x + 3) = 255;
+			if (!sameSize)
+			{
+				profileImage.at<uchar>(y, 4 * x) = 255;
+				profileImage.at<uchar>(y, 4 * x + 1) = 255;
+				profileImage.at<uchar>(y, 4 * x + 2) = 255;
+				profileImage.at<uchar>(y, 4 * x + 3) = 255;
+			}
+			else
+			{
+				profileImage.at<uchar>(y, x) = 255;
+			}
 		}
 	}
-	imshow("Line Profile", profileImage);
+	// imshow("Line Profile", profileImage);
 	return profileImage;
 }
 
@@ -1825,4 +1836,65 @@ void czh_guidedFilter(Mat & srcImage, Mat & guidanceImage, Mat & dstImage, int r
 		dstImage.convertTo(dstImage, CV_8UC1, 255);	// 转换格式
 	}
 	else if ((outputType == CV_32FC1) || (outputType == CV_32FC1)){}
+}
+
+void czh_findValley(Mat & srcImage, Mat & dstImage, int valleyRadius, int valleyThreshold1, int valleyThreshold2)
+{
+	// 该函数查找图像中的 valley 像素
+
+	CV_Assert(srcImage.channels() == 1 && dstImage.channels() == 1);
+	CV_Assert(valleyRadius >= 1);
+	CV_Assert(valleyThreshold1 >= 0 && valleyThreshold2 <= 255 && valleyThreshold1 <= valleyThreshold2);
+
+	int curValue;
+	bool jumpThisPixel_Horizontal, jumpThisPixel_rVertical;
+	uchar *ptr_u_src, *ptr_u_dst;
+	Mat tempImage(srcImage.size(), CV_8UC1, Scalar::all(0));
+
+	for (int i = valleyRadius; i < srcImage.rows - valleyRadius; i++)	// 遍历每一个允许范围内的像素
+	{
+		ptr_u_src = srcImage.ptr(i);	// 当前源图像像素行指针
+		ptr_u_dst = tempImage.ptr(i);	// 当前目标图像像素行指针
+
+		for (int j = valleyRadius; j < srcImage.cols - valleyRadius; j++)// 遍历每一个允许范围内的像素
+		{
+			if (ptr_u_src[j] < valleyThreshold1 || ptr_u_src[j] > valleyThreshold2)	// 如果当前像素灰度值比阈值小，则跳过该像素
+				continue;
+
+			curValue = ptr_u_src[j];			// 当前点像素值
+			jumpThisPixel_Horizontal = false;	// 跳过此水平像素判别符
+			jumpThisPixel_rVertical = false;	// 跳过此垂直像素判别符
+
+			////////////////////////////////////////
+			//   horizontal 水平方向查找 valley   //
+			////////////////////////////////////////
+			// 横向遍历左右一定范围内像素，如果有比当前像素更小的像素，则当前像素不是 valley
+			for (int ptr = -valleyRadius; ptr <= valleyRadius; ptr++)
+				if (ptr_u_src[j + ptr] < curValue)
+				{
+					jumpThisPixel_Horizontal = true;
+					break;
+				}
+
+			// 如果没有跳过，则说明该点是横向局部最小值，则在目标图像上置为白色
+			if (jumpThisPixel_Horizontal == false)
+				ptr_u_dst[j] = 255;
+
+			//////////////////////////////////////
+			//   vertical 垂直方向查找 valley   //
+			//////////////////////////////////////
+			// 纵向遍历左右一定范围内像素，如果有比当前像素更小的像素，则当前像素不是 valley
+			for (int ptr = -valleyRadius; ptr <= valleyRadius; ptr++)
+				if (srcImage.at<uchar>(i + ptr, j) < curValue)
+				{
+					jumpThisPixel_rVertical = true;
+					break;
+				}
+
+			// 如果没有跳过，则说明该点是纵向局部最小值，则在目标图像上置为白色
+			if (jumpThisPixel_rVertical == false)
+				tempImage.at<uchar>(i, j) = 255;
+		}
+	}
+	dstImage = tempImage;
 }

@@ -23,7 +23,7 @@ void czh_middlePointCircle(int x0, int y0, int radius, vector<Point> &pointsOfCi
 void czh_BresenhamCircle(int x0, int y0, int radius, vector<Point> &pointsOfCircle);	// Bresenham 优化画圆算法
 void czh_BresenhamLine(Point pt0, Point pt1, vector<Point> &linePoints);	// Bresenham 优化直线算法
 void czh_Circle_Profile(const Mat & srcImage, const int x0, const int y0, const int radius); // 展示以选定点为圆心，radius为半径的圆的灰度变化
-Mat czh_Line_Profile(const Mat & srcImage, Point pt0, Point pt1);	// 展示以选定的两个点为端点的直线在图中的灰度变化
+Mat czh_Line_Profile(const Mat & srcImage, Point pt0, Point pt1, bool sameSize);	// 展示以选定的两个点为端点的直线在图中的灰度变化
 void czh_labeling(Mat & src, Mat & dst);	// 该函数会使用 two - pass 算法针对二值图像做连通域标记
 void czh_labeling_backup(Mat & src, Mat & dst);	// 该函数会使用 two - pass 算法针对二值图像做连通域标记,网上函数备份版
 
@@ -32,4 +32,5 @@ void czh_centerOfGravity(Mat & labelledImage, Mat & dstImage, vector<Point> & ce
 
 void czh_bwAreaOpen(Mat & srcImage, Mat & dstImage, int zoneHeight, int zoneWidth, int threshold);		// 	该函数实现了 Matlab 中 bwareaopen 函数的功能：对一个二值图像去噪，去除连通域面积小于 threshold 的点
 void czh_guidedFilter(Mat & srcImage, Mat & guidanceImage, Mat & dstImage, int radius, float epsilon, int outputType);	// 该函数实现了何凯明博士的 guided filter 引导滤波算法
+void czh_findValley(Mat & srcImage, Mat & dstImage, int valleyRadius, int valleyThreshold1, int valleyThreshold2);	// 该函数查找图像中的 valley 像素
 #endif
