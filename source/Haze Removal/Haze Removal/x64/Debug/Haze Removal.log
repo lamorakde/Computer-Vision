@@ -1,0 +1,26 @@
+﻿  main.cpp
+e:\opencv\build\include\opencv2\core\mat.hpp(1965): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+e:\opencv\build\include\opencv2\core\persistence.hpp : warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+e:\opencv\build\include\opencv2\core\utility.hpp : warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+e:\opencv\build\include\opencv2\core\utility.hpp : warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\main.cpp(39): warning C4305: “初始化”: 从“double”到“float”截断
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\main.cpp(42): warning C4305: “初始化”: 从“double”到“float”截断
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\main.cpp(159): warning C4244: “=”: 从“float”转换到“uchar”，可能丢失数据
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\main.cpp(160): warning C4244: “=”: 从“float”转换到“uchar”，可能丢失数据
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\main.cpp(161): warning C4244: “=”: 从“float”转换到“uchar”，可能丢失数据
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\main.cpp(168): warning C4244: “=”: 从“float”转换到“uchar”，可能丢失数据
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\main.cpp(169): warning C4244: “=”: 从“float”转换到“uchar”，可能丢失数据
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\main.cpp(170): warning C4244: “=”: 从“float”转换到“uchar”，可能丢失数据
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\main.cpp(217): warning C4244: “初始化”: 从“double”转换到“int”，可能丢失数据
+  czh_binary_CV.cpp
+e:\opencv\build\include\opencv2\core\mat.hpp(1965): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+e:\opencv\build\include\opencv2\core\persistence.hpp : warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+e:\opencv\build\include\opencv2\core\utility.hpp : warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+e:\opencv\build\include\opencv2\core\utility.hpp : warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\czh_binary_cv.cpp(100): warning C4244: “=”: 从“int”转换到“float”，可能丢失数据
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\czh_binary_cv.cpp(101): warning C4244: “=”: 从“int”转换到“float”，可能丢失数据
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\czh_binary_cv.cpp(570): warning C4244: “=”: 从“double”转换到“int”，可能丢失数据
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\czh_binary_cv.cpp(898): warning C4267: “初始化”: 从“size_t”转换到“int”，可能丢失数据
+d:\gareth\my github\computer-vision\source\haze removal\haze removal\czh_binary_cv.cpp(1608): warning C4267: “初始化”: 从“size_t”转换到“int”，可能丢失数据
+  正在生成代码...
+  Haze Removal.vcxproj -> D:\Gareth\My GitHub\Computer-Vision\source\Haze Removal\x64\Debug\Haze Removal.exe
